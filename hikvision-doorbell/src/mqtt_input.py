@@ -1,4 +1,6 @@
 import json
+import requests
+from requests.auth import HTTPDigestAuth
 import asyncio
 import os
 import base64
@@ -450,25 +452,35 @@ class MQTTInput():
         doorbell = self._get_doorbell_from_args(doorbell, message)
         logger.info("Received answer command for doorbell: {}", doorbell._config.name)
 
-        url = "/ISAPI/VideoIntercom/callSignal?format=json"
-        requestBody = {
+        url = f"http://{doorbell._config.ip}/ISAPI/VideoIntercom/callSignal?format=json"
+
+        body = {
             "CallSignal": {
                 "cmdType": "answer"
             }
         }
-        # Avoid crashing inside the callback, otherwise we lose the MQTT client
+
         try:
-            doorbell._call_isapi("PUT", url, json.dumps(requestBody))
-        except SDKError as err:
-            # If error code is 23 on some indoor stations, ISAPI failed, fallback to SDK method
-            logger.error("Error while answering call with ISAPI: {}", err)
-            error_code = err.args[1]
-            if error_code == 23:
-                try:
-                    logger.debug("Answering call failed with ISAPI method, with error {} fallback to SDK method", error_code)
-                    doorbell.callsignal(2)
-                except SDKError as err:
-                    logger.error("Error while answering call with SDK: {}", err)
+            response = requests.put(
+                url,
+                auth=HTTPDigestAuth(
+                    doorbell._config.username,
+                    doorbell._config.password
+                ),
+                json=body,
+                timeout=5
+            )
+
+            logger.info(
+                "HTTP Answer response {} {}",
+                response.status_code,
+                response.text
+            )
+
+            response.raise_for_status()
+
+        except Exception:
+            logger.exception("Error while answering call via HTTP Digest")    
            
     def _caller_info_callback(self, client, doorbell: Doorbell, message: MQTTMessage):
         doorbell = self._get_doorbell_from_args(doorbell, message)

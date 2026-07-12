@@ -398,6 +398,37 @@ class Doorbell():
         except Exception as e:
             logger.error(f"Failed to save snapshot: {e}")
 
+    def call_isapi_http(self, method: str, url: str, body: str = "") -> str:
+        """Execute an ISAPI request using HTTP Digest instead of the Hikvision SDK."""
+
+        full_url = f"http://{self._config.ip}{url}"
+
+        headers = {}
+
+        if body:
+            headers["Content-Type"] = "application/json"
+
+        response = requests.request(
+            method=method,
+            url=full_url,
+            auth=HTTPDigestAuth(
+                self._config.username,
+                self._config.password
+            ),
+            headers=headers,
+            data=body,
+            timeout=10,
+        )
+
+        response.raise_for_status()
+
+        return response.text
+
+
+
+
+
+
     def callsignal(self, cmd_type: int):
         """Answer the specified door using NET_DVR_VIDEO_CALL_PARAM.
 
