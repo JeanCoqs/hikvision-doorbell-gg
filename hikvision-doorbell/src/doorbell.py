@@ -399,19 +399,52 @@ class Doorbell():
             logger.error(f"Failed to save snapshot: {e}")
 
     def callsignal(self, cmd_type: int):
-        """ Answer the specified door using the NET_DVR_VIDEO_CALL_PARAM.
-            command type: 0- Request call, 1- cancel call, 2- answer the call, 3- refuse the call, 4- called timeout, 5- end the call, 6- the device is busy, 7- the device is busy. 
+        """Answer the specified door using NET_DVR_VIDEO_CALL_PARAM.
+
+        command type:
+          0 = request call
+          1 = cancel call
+          2 = answer
+          3 = reject
+          4 = timeout
+          5 = hangup
+          6 = busy
+          7 = busy
         """
+
         gw = NET_DVR_VIDEO_CALL_PARAM()
         gw.dwSize = sizeof(NET_DVR_VIDEO_CALL_PARAM)
         gw.dwCmdType = cmd_type
-        #gw.wUnitNumber = 1
         gw.byRes = (c_byte * 115)()
 
-        result = self._sdk.NET_DVR_SetDVRConfig(self.user_id, 16036, 1, byref(gw),255)
+        logger.debug("Sending CallSignal via SDK. cmd_type={}", cmd_type)
+
+        result = self._sdk.NET_DVR_SetDVRConfig(
+            self.user_id,
+            16036,
+            1,
+            byref(gw),
+            sizeof(gw)
+        )
+
         if not result:
-            raise SDKError(self._sdk, "Error while calling NET_DVR_VIDEO_CALL_PARAM")
-        logger.info("Callsignal {} sended with SDK", cmd_type)
+            error = self._sdk.NET_DVR_GetLastError()
+
+            logger.error(
+                "NET_DVR_SetDVRConfig FAILED cmd_type={} error={}",
+                cmd_type,
+                error
+            )
+
+            raise SDKError(
+                self._sdk,
+                f"NET_DVR_SetDVRConfig failed. cmd_type={cmd_type} error={error}"
+            )
+
+        logger.info(
+            "NET_DVR_SetDVRConfig OK. cmd_type={}",
+            cmd_type
+        )
         
         
     def reboot_device(self):
